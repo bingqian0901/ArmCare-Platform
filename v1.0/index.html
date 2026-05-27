@@ -1,0 +1,1675 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ArmCare 机械臂远程运维管理平台</title>
+<!-- Tailwind CSS -->
+<script src="https://modao.cc/agent-py/static/source/js/tailwindcss.js"></script>
+<!-- Iconify -->
+<script src="https://modao.cc/agent-py/static/source/js/iconify-icon.min.js"></script>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #F5F7FA;
+            color: #1E293B;
+            overflow: hidden;
+        }
+
+        .sidebar-item-active {
+            background-color: #334155;
+            border-left: 4px solid #4F6CF7;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        .drawer-transition {
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* 模拟页面切换 */
+        .page-content {
+            display: none;
+        }
+        .page-content.active {
+            display: block;
+        }
+
+        /* Canvas 容器保持比例 */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 240px;
+        }
+    </style>
+</head>
+<body class="h-screen flex">
+<!-- 侧边栏 -->
+<aside class="w-[240px] bg-[#1E293B] flex flex-col h-full shrink-0">
+<div class="p-6 flex items-center space-x-3">
+<div class="w-10 h-10 bg-[#4F6CF7] rounded-lg flex items-center justify-center">
+<iconify-icon class="text-white text-2xl" icon="mdi:robot-arm"></iconify-icon>
+</div>
+<span class="text-white text-xl font-bold tracking-tight">ArmCare</span>
+</div>
+<nav class="flex-1 mt-4">
+<ul class="space-y-1">
+<li>
+<a class="sidebar-item flex items-center px-6 py-3.5 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors sidebar-item-active" href="javascript:void(0)" onclick="switchPage('dashboard', this)">
+<iconify-icon class="text-xl mr-3" icon="lucide:layout-dashboard"></iconify-icon>
+<span class="text-sm font-medium">实时监控看板</span>
+</a>
+</li>
+<li>
+<a class="sidebar-item flex items-center px-6 py-3.5 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors" href="javascript:void(0)" onclick="switchPage('alarms', this)">
+<iconify-icon class="text-xl mr-3" icon="lucide:alert-triangle"></iconify-icon>
+<span class="text-sm font-medium">异常告警中心</span>
+</a>
+</li>
+<li>
+<a class="sidebar-item flex items-center px-6 py-3.5 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors" href="javascript:void(0)" onclick="switchPage('history', this)">
+<iconify-icon class="text-xl mr-3" icon="lucide:line-chart"></iconify-icon>
+<span class="text-sm font-medium">历史数据查询</span>
+</a>
+</li>
+<li>
+<a class="sidebar-item flex items-center px-6 py-3.5 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors" href="javascript:void(0)" onclick="switchPage('orders', this)">
+<iconify-icon class="text-xl mr-3" icon="lucide:clipboard-list"></iconify-icon>
+<span class="text-sm font-medium">远程运维工单</span>
+</a>
+</li>
+</ul>
+<div class="mt-8 pt-8 border-t border-slate-700">
+<a class="sidebar-item flex items-center px-6 py-3.5 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors" href="javascript:void(0)" onclick="switchPage('devices', this)">
+<iconify-icon class="text-xl mr-3" icon="lucide:settings"></iconify-icon>
+<span class="text-sm font-medium">设备管理</span>
+</a>
+</div>
+</nav>
+<div class="p-6">
+<div class="bg-slate-800 rounded-xl p-4">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-xs text-white">JD</div>
+<div>
+<p class="text-white text-xs font-semibold">管理员 张三</p>
+<p class="text-slate-400 text-[10px]">系统维护专家</p>
+</div>
+</div>
+</div>
+</div>
+</aside>
+<!-- 主内容区 -->
+<main class="flex-1 flex flex-col overflow-hidden">
+<!-- 顶部通栏 -->
+<header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
+<div class="flex items-center space-x-4">
+<h2 class="text-lg font-semibold text-slate-800" id="page-title">实时监控看板</h2>
+<div class="h-4 w-[1px] bg-slate-300 mx-2"></div>
+<div class="text-slate-500 font-mono text-sm" id="current-time">2026-05-18 14:59:08</div>
+</div>
+<div class="flex items-center space-x-6">
+<div class="relative">
+<iconify-icon class="text-xl text-slate-400 cursor-pointer hover:text-slate-600" icon="lucide:bell"></iconify-icon>
+<span class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full">3</span>
+</div>
+<div class="flex items-center space-x-3 cursor-pointer group">
+<div class="w-9 h-9 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 group-hover:bg-slate-300 transition-colors">
+<iconify-icon class="text-xl" icon="lucide:user"></iconify-icon>
+</div>
+</div>
+</div>
+</header>
+<!-- 页面容器 -->
+<div class="flex-1 overflow-y-auto custom-scrollbar p-8">
+<!-- 页面1: 实时监控看板 -->
+<section class="page-content active" id="page-dashboard">
+<!-- 指标卡片 -->
+<div class="grid grid-cols-4 gap-6 mb-8">
+<div class="bg-white p-6 rounded-[12px] card-shadow flex items-center space-x-4">
+<div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+<iconify-icon class="text-2xl text-[#4F6CF7]" icon="lucide:cpu"></iconify-icon>
+</div>
+<div>
+<p class="text-slate-500 text-sm">设备总数</p>
+<p class="text-2xl font-bold text-slate-800">8 <span class="text-sm font-normal text-slate-400 ml-1">台</span></p>
+</div>
+</div>
+<div class="bg-white p-6 rounded-[12px] card-shadow flex items-center space-x-4">
+<div class="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
+<iconify-icon class="text-2xl text-[#22C55E]" icon="lucide:signal"></iconify-icon>
+</div>
+<div>
+<p class="text-slate-500 text-sm">在线率</p>
+<p class="text-2xl font-bold text-slate-800">87.5%</p>
+</div>
+</div>
+<div class="bg-white p-6 rounded-[12px] card-shadow flex items-center space-x-4">
+<div class="w-12 h-12 bg-orange-50 rounded-xl flex items-center justify-center">
+<iconify-icon class="text-2xl text-[#F59E0B]" icon="lucide:alert-circle"></iconify-icon>
+</div>
+<div>
+<p class="text-slate-500 text-sm">今日告警</p>
+<p class="text-2xl font-bold text-slate-800">3 <span class="text-sm font-normal text-slate-400 ml-1">条</span></p>
+</div>
+</div>
+<div class="bg-white p-6 rounded-[12px] card-shadow flex items-center space-x-4">
+<div class="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
+<iconify-icon class="text-2xl text-[#EF4444]" icon="lucide:thermometer"></iconify-icon>
+</div>
+<div>
+<p class="text-slate-500 text-sm">平均温度</p>
+<p class="text-2xl font-bold text-slate-800">46.2°C</p>
+</div>
+</div>
+</div>
+<!-- 主体内容 -->
+<div class="grid grid-cols-12 gap-8">
+<!-- 左侧设备列表 -->
+<div class="col-span-3 bg-white rounded-[12px] card-shadow flex flex-col overflow-hidden">
+<div class="p-4 border-b border-slate-100 flex justify-between items-center">
+<h3 class="font-semibold text-slate-800">设备列表</h3>
+<iconify-icon class="text-slate-400 cursor-pointer hover:text-[#4F6CF7] transition-colors" icon="lucide:refresh-cw"></iconify-icon>
+</div>
+<div class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1" id="device-list-container">
+<div class="device-item group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all bg-blue-50 border border-blue-100" onclick="switchDevice(1)">
+<div class="flex items-center space-x-3">
+<span class="status-dot bg-green-500"></span>
+<span class="text-sm font-medium text-[#4F6CF7]">机械臂_01</span>
+</div>
+<iconify-icon class="text-slate-300 group-hover:text-slate-400 opacity-100" icon="lucide:chevron-right"></iconify-icon>
+</div>
+<div class="device-item group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all hover:bg-slate-50" onclick="switchDevice(2)">
+<div class="flex items-center space-x-3">
+<span class="status-dot bg-green-500"></span>
+<span class="text-sm font-medium text-slate-600">机械臂_02</span>
+</div>
+<iconify-icon class="text-slate-300 group-hover:text-slate-400 opacity-0" icon="lucide:chevron-right"></iconify-icon>
+</div>
+<div class="device-item group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all hover:bg-slate-50" onclick="switchDevice(3)">
+<div class="flex items-center space-x-3">
+<span class="status-dot bg-green-500"></span>
+<span class="text-sm font-medium text-slate-600">机械臂_03</span>
+</div>
+<iconify-icon class="text-slate-300 group-hover:text-slate-400 opacity-0" icon="lucide:chevron-right"></iconify-icon>
+</div>
+<div class="device-item group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all hover:bg-slate-50" onclick="switchDevice(4)">
+<div class="flex items-center space-x-3">
+<span class="status-dot bg-green-500"></span>
+<span class="text-sm font-medium text-slate-600">机械臂_04</span>
+</div>
+<iconify-icon class="text-slate-300 group-hover:text-slate-400 opacity-0" icon="lucide:chevron-right"></iconify-icon>
+</div>
+<div class="device-item group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all hover:bg-slate-50" onclick="switchDevice(5)">
+<div class="flex items-center space-x-3">
+<span class="status-dot bg-green-500"></span>
+<span class="text-sm font-medium text-slate-600">机械臂_05</span>
+</div>
+<iconify-icon class="text-slate-300 group-hover:text-slate-400 opacity-0" icon="lucide:chevron-right"></iconify-icon>
+</div>
+<div class="device-item group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all hover:bg-slate-50" onclick="switchDevice(6)">
+<div class="flex items-center space-x-3">
+<span class="status-dot bg-green-500"></span>
+<span class="text-sm font-medium text-slate-600">机械臂_06</span>
+</div>
+<iconify-icon class="text-slate-300 group-hover:text-slate-400 opacity-0" icon="lucide:chevron-right"></iconify-icon>
+</div>
+<div class="device-item group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all hover:bg-slate-50" onclick="switchDevice(7)">
+<div class="flex items-center space-x-3">
+<span class="status-dot bg-red-500"></span>
+<span class="text-sm font-medium text-slate-600">机械臂_07</span>
+</div>
+<iconify-icon class="text-slate-300 group-hover:text-slate-400 opacity-0" icon="lucide:chevron-right"></iconify-icon>
+</div>
+<div class="device-item group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all hover:bg-slate-50" onclick="switchDevice(8)">
+<div class="flex items-center space-x-3">
+<span class="status-dot bg-orange-500"></span>
+<span class="text-sm font-medium text-slate-600">机械臂_08</span>
+</div>
+<iconify-icon class="text-slate-300 group-hover:text-slate-400 opacity-0" icon="lucide:chevron-right"></iconify-icon>
+</div>
+</div>
+</div>
+<!-- 右侧详情 -->
+<div class="col-span-9 space-y-8">
+<!-- 关键参数 -->
+<div class="bg-white p-6 rounded-[12px] card-shadow">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-semibold text-slate-800" id="detail-title">关键参数 - 机械臂_01</h3>
+<span class="px-2.5 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex items-center">
+<span class="w-2 h-2 bg-green-500 rounded-full mr-1.5"></span>
+                                    运行中
+                                </span>
+</div>
+<div class="grid grid-cols-6 gap-4" id="param-grid">
+<div class="bg-slate-50 p-4 rounded-xl">
+<p class="text-[10px] text-slate-400 font-bold uppercase mb-1">关节1温度</p>
+<p class="text-lg font-bold text-slate-700">45.2°C</p>
+</div>
+<div class="bg-slate-50 p-4 rounded-xl">
+<p class="text-[10px] text-slate-400 font-bold uppercase mb-1">关节2温度</p>
+<p class="text-lg font-bold text-slate-700">57.8°C</p>
+</div>
+<div class="bg-slate-50 p-4 rounded-xl">
+<p class="text-[10px] text-slate-400 font-bold uppercase mb-1">末端X(mm)</p>
+<p class="text-lg font-bold text-slate-700">114.56</p>
+</div>
+<div class="bg-slate-50 p-4 rounded-xl">
+<p class="text-[10px] text-slate-400 font-bold uppercase mb-1">末端Y(mm)</p>
+<p class="text-lg font-bold text-slate-700">137.91</p>
+</div>
+<div class="bg-slate-50 p-4 rounded-xl">
+<p class="text-[10px] text-slate-400 font-bold uppercase mb-1">末端Z(mm)</p>
+<p class="text-lg font-bold text-slate-700">475.56</p>
+</div>
+<div class="bg-slate-50 p-4 rounded-xl">
+<p class="text-[10px] text-slate-400 font-bold uppercase mb-1">当前任务</p>
+<p class="text-sm font-bold text-[#4F6CF7] mt-1">组装作业</p>
+</div>
+</div>
+</div>
+<!-- 趋势图 -->
+<div class="bg-white p-6 rounded-[12px] card-shadow">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-semibold text-slate-800">关节角度趋势（最近5分钟）</h3>
+<div class="flex items-center space-x-4 text-xs">
+<div class="flex items-center"><span class="w-3 h-1 bg-[#4F6CF7] mr-1"></span> J1</div>
+<div class="flex items-center"><span class="w-3 h-1 bg-[#22C55E] mr-1"></span> J2</div>
+<div class="flex items-center"><span class="w-3 h-1 bg-[#F59E0B] mr-1"></span> J3</div>
+<div class="flex items-center"><span class="w-3 h-1 bg-[#EF4444] mr-1"></span> J4</div>
+<div class="flex items-center"><span class="w-3 h-1 bg-[#A855F7] mr-1"></span> J5</div>
+<div class="flex items-center"><span class="w-3 h-1 bg-[#06B6D4] mr-1"></span> J6</div>
+</div>
+</div>
+<div class="chart-container">
+<canvas class="w-full h-full" height="330" id="jointChart" width="840"></canvas>
+</div>
+</div>
+<!-- 最近告警 -->
+<div class="bg-white p-6 rounded-[12px] card-shadow">
+<h3 class="font-semibold text-slate-800 mb-4">最近告警</h3>
+<div class="space-y-3">
+<div class="flex items-center justify-between p-3 bg-red-50 border border-red-100 rounded-lg">
+<div class="flex items-center space-x-3">
+<span class="px-2 py-0.5 bg-red-500 text-white text-[10px] rounded uppercase font-bold">严重</span>
+<span class="text-sm text-slate-700 font-medium">机械臂_07 关节2温度超限 (85°C)</span>
+</div>
+<span class="text-xs text-slate-500">10:23:15</span>
+</div>
+<div class="flex items-center justify-between p-3 bg-orange-50 border border-orange-100 rounded-lg">
+<div class="flex items-center space-x-3">
+<span class="px-2 py-0.5 bg-orange-500 text-white text-[10px] rounded uppercase font-bold">警告</span>
+<span class="text-sm text-slate-700 font-medium">机械臂_04 关节5震动异常</span>
+</div>
+<span class="text-xs text-slate-500">10:18:42</span>
+</div>
+<div class="flex items-center justify-between p-3 bg-blue-50 border border-blue-100 rounded-lg">
+<div class="flex items-center space-x-3">
+<span class="px-2 py-0.5 bg-blue-500 text-white text-[10px] rounded uppercase font-bold">提示</span>
+<span class="text-sm text-slate-700 font-medium">机械臂_02 已完成定期校准</span>
+</div>
+<span class="text-xs text-slate-500">10:05:00</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 页面2: 异常告警中心 -->
+<section class="page-content" id="page-alarms">
+<div class="bg-white p-6 rounded-[12px] card-shadow mb-8">
+<div class="grid grid-cols-5 gap-4">
+<div class="col-span-1">
+<label class="block text-xs font-medium text-slate-500 mb-1.5">告警级别</label>
+<select class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F6CF7]/20 focus:border-[#4F6CF7]">
+<option>全部级别</option>
+<option>严重</option>
+<option>警告</option>
+<option>提示</option>
+</select>
+</div>
+<div class="col-span-1">
+<label class="block text-xs font-medium text-slate-500 mb-1.5">设备名称</label>
+<select class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F6CF7]/20 focus:border-[#4F6CF7]">
+<option>全部设备</option>
+<option>机械臂_01</option>
+<option>机械臂_02</option>
+<option>机械臂_03</option>
+<option>机械臂_04</option>
+<option>机械臂_05</option>
+<option>机械臂_06</option>
+<option>机械臂_07</option>
+<option>机械臂_08</option>
+</select>
+</div>
+<div class="col-span-2">
+<label class="block text-xs font-medium text-slate-500 mb-1.5">时间范围</label>
+<div class="flex items-center space-x-2">
+<input class="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none" type="date"/>
+<span class="text-slate-400">~</span>
+<input class="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none" type="date"/>
+</div>
+</div>
+<div class="col-span-1 flex items-end space-x-2">
+<button class="flex-1 bg-[#4F6CF7] text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">搜索</button>
+<button class="flex-1 bg-slate-100 text-slate-600 py-2 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors">重置</button>
+</div>
+</div>
+</div>
+<div class="bg-white rounded-[12px] card-shadow overflow-hidden">
+<table class="w-full text-left">
+<thead class="bg-slate-50 border-b border-slate-100">
+<tr>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">告警ID</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">级别</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">设备名称</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">告警内容</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">发生时间</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">确认状态</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">处理状态</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100" id="alarm-table-body">
+<tr class="hover:bg-slate-50 cursor-pointer transition-colors" onclick="showAlarmDetail('AL-001', '严重', '机械臂_07', '关节2温度超限 (85°C)', '2026-05-18 10:23:15')">
+<td class="px-6 py-4 text-sm font-mono text-slate-500">AL-001</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded text-[10px] font-bold uppercase bg-red-100 text-red-600">严重</span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-700 font-medium">机械臂_07</td>
+<td class="px-6 py-4 text-sm text-slate-600">关节2温度超限 (85°C)</td>
+<td class="px-6 py-4 text-sm text-slate-500 font-mono">10:23:15</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">未确认</span>
+</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-medium bg-red-100 text-red-700">未处理</span>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 cursor-pointer transition-colors" onclick="showAlarmDetail('AL-002', '警告', '机械臂_04', '关节5震动异常', '2026-05-18 10:18:42')">
+<td class="px-6 py-4 text-sm font-mono text-slate-500">AL-002</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded text-[10px] font-bold uppercase bg-orange-100 text-orange-600">警告</span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-700 font-medium">机械臂_04</td>
+<td class="px-6 py-4 text-sm text-slate-600">关节5震动异常</td>
+<td class="px-6 py-4 text-sm text-slate-500 font-mono">10:18:42</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-medium bg-green-100 text-green-700">已确认</span>
+</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-medium bg-orange-100 text-orange-700">处理中</span>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 cursor-pointer transition-colors" onclick="showAlarmDetail('AL-003', '提示', '机械臂_02', '定期校准已到期', '2026-05-18 10:05:00')">
+<td class="px-6 py-4 text-sm font-mono text-slate-500">AL-003</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded text-[10px] font-bold uppercase bg-blue-100 text-blue-600">提示</span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-700 font-medium">机械臂_02</td>
+<td class="px-6 py-4 text-sm text-slate-600">定期校准已到期</td>
+<td class="px-6 py-4 text-sm text-slate-500 font-mono">10:05:00</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-medium bg-green-100 text-green-700">已确认</span>
+</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-medium bg-green-100 text-green-700">已解决</span>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 cursor-pointer transition-colors" onclick="showAlarmDetail('AL-004', '警告', '机械臂_01', '通信延迟过高', '2026-05-18 09:45:12')">
+<td class="px-6 py-4 text-sm font-mono text-slate-500">AL-004</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded text-[10px] font-bold uppercase bg-orange-100 text-orange-600">警告</span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-700 font-medium">机械臂_01</td>
+<td class="px-6 py-4 text-sm text-slate-600">通信延迟过高</td>
+<td class="px-6 py-4 text-sm text-slate-500 font-mono">09:45:12</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">未确认</span>
+</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-medium bg-red-100 text-red-700">未处理</span>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 cursor-pointer transition-colors" onclick="showAlarmDetail('AL-005', '严重', '机械臂_08', '急停按钮触发', '2026-05-18 09:30:00')">
+<td class="px-6 py-4 text-sm font-mono text-slate-500">AL-005</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded text-[10px] font-bold uppercase bg-red-100 text-red-600">严重</span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-700 font-medium">机械臂_08</td>
+<td class="px-6 py-4 text-sm text-slate-600">急停按钮触发</td>
+<td class="px-6 py-4 text-sm text-slate-500 font-mono">09:30:00</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-medium bg-green-100 text-green-700">已确认</span>
+</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-medium bg-green-100 text-green-700">已解决</span>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 cursor-pointer transition-colors" onclick="showAlarmDetail('AL-006', '提示', '机械臂_03', '润滑液液位低', '2026-05-18 09:15:33')">
+<td class="px-6 py-4 text-sm font-mono text-slate-500">AL-006</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded text-[10px] font-bold uppercase bg-blue-100 text-blue-600">提示</span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-700 font-medium">机械臂_03</td>
+<td class="px-6 py-4 text-sm text-slate-600">润滑液液位低</td>
+<td class="px-6 py-4 text-sm text-slate-500 font-mono">09:15:33</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">未确认</span>
+</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-medium bg-red-100 text-red-700">未处理</span>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 cursor-pointer transition-colors" onclick="showAlarmDetail('AL-007', '警告', '机械臂_06', '负载超出额定范围', '2026-05-18 08:50:21')">
+<td class="px-6 py-4 text-sm font-mono text-slate-500">AL-007</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded text-[10px] font-bold uppercase bg-orange-100 text-orange-600">警告</span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-700 font-medium">机械臂_06</td>
+<td class="px-6 py-4 text-sm text-slate-600">负载超出额定范围</td>
+<td class="px-6 py-4 text-sm text-slate-500 font-mono">08:50:21</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-medium bg-green-100 text-green-700">已确认</span>
+</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-medium bg-orange-100 text-orange-700">处理中</span>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 cursor-pointer transition-colors" onclick="showAlarmDetail('AL-008', '提示', '机械臂_05', '系统更新可用', '2026-05-18 08:20:05')">
+<td class="px-6 py-4 text-sm font-mono text-slate-500">AL-008</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded text-[10px] font-bold uppercase bg-blue-100 text-blue-600">提示</span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-700 font-medium">机械臂_05</td>
+<td class="px-6 py-4 text-sm text-slate-600">系统更新可用</td>
+<td class="px-6 py-4 text-sm text-slate-500 font-mono">08:20:05</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">未确认</span>
+</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-medium bg-red-100 text-red-700">未处理</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="mt-6 flex justify-between items-center">
+<button class="bg-[#4F6CF7] text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors shadow-sm" onclick="alert('已确认选中的告警')">批量确认</button>
+<div class="flex items-center space-x-2">
+<button class="w-8 h-8 flex items-center justify-center border border-slate-200 rounded text-slate-400 hover:bg-slate-50"><iconify-icon icon="lucide:chevron-left"></iconify-icon></button>
+<button class="w-8 h-8 flex items-center justify-center bg-[#4F6CF7] text-white rounded text-sm">1</button>
+<button class="w-8 h-8 flex items-center justify-center border border-slate-200 text-slate-600 rounded text-sm hover:bg-slate-50">2</button>
+<button class="w-8 h-8 flex items-center justify-center border border-slate-200 rounded text-slate-400 hover:bg-slate-50"><iconify-icon icon="lucide:chevron-right"></iconify-icon></button>
+</div>
+</div>
+</section>
+<!-- 页面3: 历史数据查询 -->
+<section class="page-content" id="page-history">
+<div class="bg-white p-6 rounded-[12px] card-shadow mb-8">
+<div class="flex flex-wrap items-end gap-6">
+<div class="w-48">
+<label class="block text-xs font-medium text-slate-500 mb-1.5">选择设备</label>
+<select class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none">
+<option>机械臂_01</option>
+<option>机械臂_02</option>
+<option>机械臂_03</option>
+</select>
+</div>
+<div>
+<label class="block text-xs font-medium text-slate-500 mb-1.5">数据类型</label>
+<div class="flex bg-slate-100 p-1 rounded-lg">
+<button class="px-4 py-1.5 text-sm font-medium rounded-md bg-white shadow-sm text-[#4F6CF7]">关节角度</button>
+<button class="px-4 py-1.5 text-sm font-medium rounded-md text-slate-500 hover:text-slate-700">温度</button>
+<button class="px-4 py-1.5 text-sm font-medium rounded-md text-slate-500 hover:text-slate-700">末端位姿</button>
+</div>
+</div>
+<div class="flex items-center space-x-3">
+<div>
+<label class="block text-xs font-medium text-slate-500 mb-1.5">开始时间</label>
+<input class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none" type="datetime-local"/>
+</div>
+<span class="mt-7 text-slate-400">至</span>
+<div>
+<label class="block text-xs font-medium text-slate-500 mb-1.5">结束时间</label>
+<input class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none" type="datetime-local"/>
+</div>
+</div>
+<div class="flex space-x-3">
+<button class="bg-[#4F6CF7] text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">查询</button>
+<button class="bg-white border border-slate-200 text-slate-600 px-6 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors flex items-center">
+<iconify-icon class="mr-2" icon="lucide:download"></iconify-icon> 导出CSV
+                            </button>
+</div>
+</div>
+</div>
+<div class="bg-white p-6 rounded-[12px] card-shadow mb-8">
+<h3 class="font-semibold text-slate-800 mb-6">历史趋势分析</h3>
+<div class="chart-container h-[320px]">
+<canvas class="w-full h-full" height="400" id="historyChart" width="2071"></canvas>
+</div>
+</div>
+<div class="bg-white rounded-[12px] card-shadow overflow-hidden">
+<div class="max-h-[400px] overflow-y-auto custom-scrollbar">
+<table class="w-full text-left">
+<thead class="bg-slate-50 sticky top-0 border-b border-slate-100">
+<tr>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">时间</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">J1(°)</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">J1 Temp(°C)</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">J2(°)</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">J2 Temp(°C)</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">末端X(mm)</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">末端Y(mm)</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">末端Z(mm)</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100" id="history-table-body">
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-3 text-sm font-mono text-slate-500">2026-05-18 10:55:00</td>
+<td class="px-6 py-3 text-sm text-slate-600">3.0</td>
+<td class="px-6 py-3 text-sm text-slate-600">40.4</td>
+<td class="px-6 py-3 text-sm text-slate-600">222.9</td>
+<td class="px-6 py-3 text-sm text-slate-600">45.5</td>
+<td class="px-6 py-3 text-sm text-slate-600">186.8</td>
+<td class="px-6 py-3 text-sm text-slate-600">271.4</td>
+<td class="px-6 py-3 text-sm text-slate-600">194.1</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-3 text-sm font-mono text-slate-500">2026-05-18 10:54:00</td>
+<td class="px-6 py-3 text-sm text-slate-600">89.4</td>
+<td class="px-6 py-3 text-sm text-slate-600">40.9</td>
+<td class="px-6 py-3 text-sm text-slate-600">52.7</td>
+<td class="px-6 py-3 text-sm text-slate-600">42.4</td>
+<td class="px-6 py-3 text-sm text-slate-600">203.7</td>
+<td class="px-6 py-3 text-sm text-slate-600">116.8</td>
+<td class="px-6 py-3 text-sm text-slate-600">146.6</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-3 text-sm font-mono text-slate-500">2026-05-18 10:53:00</td>
+<td class="px-6 py-3 text-sm text-slate-600">15.4</td>
+<td class="px-6 py-3 text-sm text-slate-600">43.5</td>
+<td class="px-6 py-3 text-sm text-slate-600">271.2</td>
+<td class="px-6 py-3 text-sm text-slate-600">47.9</td>
+<td class="px-6 py-3 text-sm text-slate-600">206.1</td>
+<td class="px-6 py-3 text-sm text-slate-600">106.8</td>
+<td class="px-6 py-3 text-sm text-slate-600">251.9</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-3 text-sm font-mono text-slate-500">2026-05-18 10:52:00</td>
+<td class="px-6 py-3 text-sm text-slate-600">120.4</td>
+<td class="px-6 py-3 text-sm text-slate-600">40.6</td>
+<td class="px-6 py-3 text-sm text-slate-600">20.7</td>
+<td class="px-6 py-3 text-sm text-slate-600">49.4</td>
+<td class="px-6 py-3 text-sm text-slate-600">121.1</td>
+<td class="px-6 py-3 text-sm text-slate-600">266.6</td>
+<td class="px-6 py-3 text-sm text-slate-600">284.9</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-3 text-sm font-mono text-slate-500">2026-05-18 10:51:00</td>
+<td class="px-6 py-3 text-sm text-slate-600">110.9</td>
+<td class="px-6 py-3 text-sm text-slate-600">41.7</td>
+<td class="px-6 py-3 text-sm text-slate-600">172.8</td>
+<td class="px-6 py-3 text-sm text-slate-600">45.0</td>
+<td class="px-6 py-3 text-sm text-slate-600">270.8</td>
+<td class="px-6 py-3 text-sm text-slate-600">158.6</td>
+<td class="px-6 py-3 text-sm text-slate-600">228.6</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-3 text-sm font-mono text-slate-500">2026-05-18 10:50:00</td>
+<td class="px-6 py-3 text-sm text-slate-600">145.8</td>
+<td class="px-6 py-3 text-sm text-slate-600">41.4</td>
+<td class="px-6 py-3 text-sm text-slate-600">102.5</td>
+<td class="px-6 py-3 text-sm text-slate-600">49.6</td>
+<td class="px-6 py-3 text-sm text-slate-600">102.5</td>
+<td class="px-6 py-3 text-sm text-slate-600">162.7</td>
+<td class="px-6 py-3 text-sm text-slate-600">167.4</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-3 text-sm font-mono text-slate-500">2026-05-18 10:49:00</td>
+<td class="px-6 py-3 text-sm text-slate-600">294.5</td>
+<td class="px-6 py-3 text-sm text-slate-600">47.4</td>
+<td class="px-6 py-3 text-sm text-slate-600">12.8</td>
+<td class="px-6 py-3 text-sm text-slate-600">44.3</td>
+<td class="px-6 py-3 text-sm text-slate-600">299.9</td>
+<td class="px-6 py-3 text-sm text-slate-600">120.7</td>
+<td class="px-6 py-3 text-sm text-slate-600">245.4</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-3 text-sm font-mono text-slate-500">2026-05-18 10:48:00</td>
+<td class="px-6 py-3 text-sm text-slate-600">284.1</td>
+<td class="px-6 py-3 text-sm text-slate-600">48.3</td>
+<td class="px-6 py-3 text-sm text-slate-600">60.0</td>
+<td class="px-6 py-3 text-sm text-slate-600">46.7</td>
+<td class="px-6 py-3 text-sm text-slate-600">299.0</td>
+<td class="px-6 py-3 text-sm text-slate-600">119.7</td>
+<td class="px-6 py-3 text-sm text-slate-600">180.5</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-3 text-sm font-mono text-slate-500">2026-05-18 10:47:00</td>
+<td class="px-6 py-3 text-sm text-slate-600">209.6</td>
+<td class="px-6 py-3 text-sm text-slate-600">44.0</td>
+<td class="px-6 py-3 text-sm text-slate-600">196.4</td>
+<td class="px-6 py-3 text-sm text-slate-600">43.5</td>
+<td class="px-6 py-3 text-sm text-slate-600">208.2</td>
+<td class="px-6 py-3 text-sm text-slate-600">167.4</td>
+<td class="px-6 py-3 text-sm text-slate-600">164.3</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-3 text-sm font-mono text-slate-500">2026-05-18 10:46:00</td>
+<td class="px-6 py-3 text-sm text-slate-600">242.4</td>
+<td class="px-6 py-3 text-sm text-slate-600">47.3</td>
+<td class="px-6 py-3 text-sm text-slate-600">22.5</td>
+<td class="px-6 py-3 text-sm text-slate-600">43.4</td>
+<td class="px-6 py-3 text-sm text-slate-600">196.5</td>
+<td class="px-6 py-3 text-sm text-slate-600">154.2</td>
+<td class="px-6 py-3 text-sm text-slate-600">288.2</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-3 text-sm font-mono text-slate-500">2026-05-18 10:45:00</td>
+<td class="px-6 py-3 text-sm text-slate-600">211.2</td>
+<td class="px-6 py-3 text-sm text-slate-600">46.9</td>
+<td class="px-6 py-3 text-sm text-slate-600">324.7</td>
+<td class="px-6 py-3 text-sm text-slate-600">41.5</td>
+<td class="px-6 py-3 text-sm text-slate-600">120.3</td>
+<td class="px-6 py-3 text-sm text-slate-600">258.7</td>
+<td class="px-6 py-3 text-sm text-slate-600">191.8</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-3 text-sm font-mono text-slate-500">2026-05-18 10:44:00</td>
+<td class="px-6 py-3 text-sm text-slate-600">120.8</td>
+<td class="px-6 py-3 text-sm text-slate-600">48.7</td>
+<td class="px-6 py-3 text-sm text-slate-600">41.7</td>
+<td class="px-6 py-3 text-sm text-slate-600">45.8</td>
+<td class="px-6 py-3 text-sm text-slate-600">151.2</td>
+<td class="px-6 py-3 text-sm text-slate-600">130.6</td>
+<td class="px-6 py-3 text-sm text-slate-600">101.4</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-3 text-sm font-mono text-slate-500">2026-05-18 10:43:00</td>
+<td class="px-6 py-3 text-sm text-slate-600">337.7</td>
+<td class="px-6 py-3 text-sm text-slate-600">49.8</td>
+<td class="px-6 py-3 text-sm text-slate-600">97.1</td>
+<td class="px-6 py-3 text-sm text-slate-600">44.4</td>
+<td class="px-6 py-3 text-sm text-slate-600">187.3</td>
+<td class="px-6 py-3 text-sm text-slate-600">278.0</td>
+<td class="px-6 py-3 text-sm text-slate-600">145.5</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-3 text-sm font-mono text-slate-500">2026-05-18 10:42:00</td>
+<td class="px-6 py-3 text-sm text-slate-600">266.8</td>
+<td class="px-6 py-3 text-sm text-slate-600">48.5</td>
+<td class="px-6 py-3 text-sm text-slate-600">100.5</td>
+<td class="px-6 py-3 text-sm text-slate-600">45.8</td>
+<td class="px-6 py-3 text-sm text-slate-600">233.4</td>
+<td class="px-6 py-3 text-sm text-slate-600">180.3</td>
+<td class="px-6 py-3 text-sm text-slate-600">146.3</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-3 text-sm font-mono text-slate-500">2026-05-18 10:41:00</td>
+<td class="px-6 py-3 text-sm text-slate-600">200.9</td>
+<td class="px-6 py-3 text-sm text-slate-600">44.0</td>
+<td class="px-6 py-3 text-sm text-slate-600">208.8</td>
+<td class="px-6 py-3 text-sm text-slate-600">43.1</td>
+<td class="px-6 py-3 text-sm text-slate-600">153.5</td>
+<td class="px-6 py-3 text-sm text-slate-600">248.3</td>
+<td class="px-6 py-3 text-sm text-slate-600">227.3</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<!-- 页面4: 远程运维工单 -->
+<section class="page-content" id="page-orders">
+<div class="flex justify-between items-center mb-8">
+<div class="flex space-x-1 border-b border-slate-200">
+<button class="px-6 py-3 text-sm font-medium text-[#4F6CF7] border-b-2 border-[#4F6CF7]">全部</button>
+<button class="px-6 py-3 text-sm font-medium text-slate-500 hover:text-slate-700">待处理</button>
+<button class="px-6 py-3 text-sm font-medium text-slate-500 hover:text-slate-700">处理中</button>
+<button class="px-6 py-3 text-sm font-medium text-slate-500 hover:text-slate-700">已完成</button>
+</div>
+<button class="bg-[#4F6CF7] text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors flex items-center shadow-md" onclick="toggleModal('newOrderModal', true)">
+<iconify-icon class="mr-2" icon="lucide:plus"></iconify-icon> 新建工单
+                    </button>
+</div>
+<div class="grid grid-cols-3 gap-6" id="order-grid">
+<div class="bg-white p-6 rounded-[12px] card-shadow border border-slate-100 hover:border-[#4F6CF7]/30 transition-all group">
+<div class="flex justify-between items-start mb-4">
+<span class="text-xs font-mono text-slate-400">WO-2025-001</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-red-100 text-red-600">高</span>
+</div>
+<h4 class="font-bold text-slate-800 mb-2 group-hover:text-[#4F6CF7] transition-colors">机械臂_07 关节温度异常检修</h4>
+<div class="space-y-2 mb-6">
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:box"></iconify-icon> 机械臂_07
+                        </div>
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:clock"></iconify-icon> 2026-05-18 10:30
+                        </div>
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:user"></iconify-icon> 指派给: 张三
+                        </div>
+</div>
+<div class="flex items-center justify-between pt-4 border-t border-slate-50">
+<span class="text-xs font-medium text-blue-600 flex items-center">
+<span class="w-1.5 h-1.5 rounded-full mr-2 bg-blue-500"></span>
+                            处理中
+                        </span>
+<a class="text-xs font-bold text-[#4F6CF7] hover:underline" href="javascript:void(0)" onclick="alert('查看详情: WO-2025-001')">查看详情</a>
+</div>
+</div>
+<div class="bg-white p-6 rounded-[12px] card-shadow border border-slate-100 hover:border-[#4F6CF7]/30 transition-all group">
+<div class="flex justify-between items-start mb-4">
+<span class="text-xs font-mono text-slate-400">WO-2025-002</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-orange-100 text-orange-600">中</span>
+</div>
+<h4 class="font-bold text-slate-800 mb-2 group-hover:text-[#4F6CF7] transition-colors">机械臂_04 关节抖动校准</h4>
+<div class="space-y-2 mb-6">
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:box"></iconify-icon> 机械臂_04
+                        </div>
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:clock"></iconify-icon> 2026-05-18 11:15
+                        </div>
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:user"></iconify-icon> 指派给: 李四
+                        </div>
+</div>
+<div class="flex items-center justify-between pt-4 border-t border-slate-50">
+<span class="text-xs font-medium text-slate-400 flex items-center">
+<span class="w-1.5 h-1.5 rounded-full mr-2 bg-slate-300"></span>
+                            待处理
+                        </span>
+<a class="text-xs font-bold text-[#4F6CF7] hover:underline" href="javascript:void(0)" onclick="alert('查看详情: WO-2025-002')">查看详情</a>
+</div>
+</div>
+<div class="bg-white p-6 rounded-[12px] card-shadow border border-slate-100 hover:border-[#4F6CF7]/30 transition-all group">
+<div class="flex justify-between items-start mb-4">
+<span class="text-xs font-mono text-slate-400">WO-2025-003</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-100 text-blue-600">低</span>
+</div>
+<h4 class="font-bold text-slate-800 mb-2 group-hover:text-[#4F6CF7] transition-colors">全厂设备季度例行保养</h4>
+<div class="space-y-2 mb-6">
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:box"></iconify-icon> 全部设备
+                        </div>
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:clock"></iconify-icon> 2026-05-17 09:00
+                        </div>
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:user"></iconify-icon> 指派给: 王五
+                        </div>
+</div>
+<div class="flex items-center justify-between pt-4 border-t border-slate-50">
+<span class="text-xs font-medium text-green-600 flex items-center">
+<span class="w-1.5 h-1.5 rounded-full mr-2 bg-green-500"></span>
+                            已完成
+                        </span>
+<a class="text-xs font-bold text-[#4F6CF7] hover:underline" href="javascript:void(0)" onclick="alert('查看详情: WO-2025-003')">查看详情</a>
+</div>
+</div>
+<div class="bg-white p-6 rounded-[12px] card-shadow border border-slate-100 hover:border-[#4F6CF7]/30 transition-all group">
+<div class="flex justify-between items-start mb-4">
+<span class="text-xs font-mono text-slate-400">WO-2025-004</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-red-100 text-red-600">高</span>
+</div>
+<h4 class="font-bold text-slate-800 mb-2 group-hover:text-[#4F6CF7] transition-colors">机械臂_01 通信模块更换</h4>
+<div class="space-y-2 mb-6">
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:box"></iconify-icon> 机械臂_01
+                        </div>
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:clock"></iconify-icon> 2026-05-18 13:45
+                        </div>
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:user"></iconify-icon> 指派给: 赵六
+                        </div>
+</div>
+<div class="flex items-center justify-between pt-4 border-t border-slate-50">
+<span class="text-xs font-medium text-slate-400 flex items-center">
+<span class="w-1.5 h-1.5 rounded-full mr-2 bg-slate-300"></span>
+                            待处理
+                        </span>
+<a class="text-xs font-bold text-[#4F6CF7] hover:underline" href="javascript:void(0)" onclick="alert('查看详情: WO-2025-004')">查看详情</a>
+</div>
+</div>
+<div class="bg-white p-6 rounded-[12px] card-shadow border border-slate-100 hover:border-[#4F6CF7]/30 transition-all group">
+<div class="flex justify-between items-start mb-4">
+<span class="text-xs font-mono text-slate-400">WO-2025-005</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-red-100 text-red-600">高</span>
+</div>
+<h4 class="font-bold text-slate-800 mb-2 group-hover:text-[#4F6CF7] transition-colors">机械臂_08 急停电路复位</h4>
+<div class="space-y-2 mb-6">
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:box"></iconify-icon> 机械臂_08
+                        </div>
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:clock"></iconify-icon> 2026-05-18 09:40
+                        </div>
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:user"></iconify-icon> 指派给: 张三
+                        </div>
+</div>
+<div class="flex items-center justify-between pt-4 border-t border-slate-50">
+<span class="text-xs font-medium text-green-600 flex items-center">
+<span class="w-1.5 h-1.5 rounded-full mr-2 bg-green-500"></span>
+                            已完成
+                        </span>
+<a class="text-xs font-bold text-[#4F6CF7] hover:underline" href="javascript:void(0)" onclick="alert('查看详情: WO-2025-005')">查看详情</a>
+</div>
+</div>
+<div class="bg-white p-6 rounded-[12px] card-shadow border border-slate-100 hover:border-[#4F6CF7]/30 transition-all group">
+<div class="flex justify-between items-start mb-4">
+<span class="text-xs font-mono text-slate-400">WO-2025-006</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-100 text-blue-600">低</span>
+</div>
+<h4 class="font-bold text-slate-800 mb-2 group-hover:text-[#4F6CF7] transition-colors">机械臂_03 润滑油添加</h4>
+<div class="space-y-2 mb-6">
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:box"></iconify-icon> 机械臂_03
+                        </div>
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:clock"></iconify-icon> 2026-05-18 14:20
+                        </div>
+<div class="flex items-center text-xs text-slate-500">
+<iconify-icon class="mr-2" icon="lucide:user"></iconify-icon> 指派给: 李四
+                        </div>
+</div>
+<div class="flex items-center justify-between pt-4 border-t border-slate-50">
+<span class="text-xs font-medium text-slate-400 flex items-center">
+<span class="w-1.5 h-1.5 rounded-full mr-2 bg-slate-300"></span>
+                            待处理
+                        </span>
+<a class="text-xs font-bold text-[#4F6CF7] hover:underline" href="javascript:void(0)" onclick="alert('查看详情: WO-2025-006')">查看详情</a>
+</div>
+</div>
+</div>
+</section>
+<!-- 页面5: 设备管理 -->
+<section class="page-content" id="page-devices">
+<div class="flex justify-between items-center mb-8">
+<h3 class="text-xl font-bold text-slate-800">设备管理</h3>
+<button class="bg-[#4F6CF7] text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors flex items-center shadow-md" onclick="toggleModal('addDeviceModal', true)">
+<iconify-icon class="mr-2" icon="lucide:plus"></iconify-icon> 添加设备
+                    </button>
+</div>
+<div class="bg-white rounded-[12px] card-shadow overflow-hidden">
+<table class="w-full text-left">
+<thead class="bg-slate-50 border-b border-slate-100">
+<tr>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">设备ID</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">设备名称</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">IP地址</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">型号</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">所在位置</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">最后在线时间</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">操作</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100" id="device-management-body">
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-4 text-sm font-mono text-slate-500">ARM-01</td>
+<td class="px-6 py-4">
+<div class="flex items-center space-x-2">
+<span class="text-sm font-medium text-slate-700">机械臂_01</span>
+<iconify-icon class="text-slate-300 cursor-pointer hover:text-[#4F6CF7] text-xs" icon="lucide:edit-2" onclick="inlineEdit(this)"></iconify-icon>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600 font-mono">192.168.1.101</td>
+<td class="px-6 py-4 text-sm text-slate-600">ARM-X-100</td>
+<td class="px-6 py-4 text-sm text-slate-600">A区 01流水线</td>
+<td class="px-6 py-4 text-sm text-slate-400 font-mono">2026-05-18 10:55</td>
+<td class="px-6 py-4">
+<div class="flex items-center space-x-3">
+<button class="text-[#4F6CF7] hover:text-blue-700 font-medium text-sm" onclick="toggleModal('addDeviceModal', true)">编辑</button>
+<button class="text-red-500 hover:text-red-700 font-medium text-sm" onclick="confirm('确定删除该设备吗？')">删除</button>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-4 text-sm font-mono text-slate-500">ARM-02</td>
+<td class="px-6 py-4">
+<div class="flex items-center space-x-2">
+<span class="text-sm font-medium text-slate-700">机械臂_02</span>
+<iconify-icon class="text-slate-300 cursor-pointer hover:text-[#4F6CF7] text-xs" icon="lucide:edit-2" onclick="inlineEdit(this)"></iconify-icon>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600 font-mono">192.168.1.102</td>
+<td class="px-6 py-4 text-sm text-slate-600">ARM-X-100</td>
+<td class="px-6 py-4 text-sm text-slate-600">A区 02流水线</td>
+<td class="px-6 py-4 text-sm text-slate-400 font-mono">2026-05-18 10:52</td>
+<td class="px-6 py-4">
+<div class="flex items-center space-x-3">
+<button class="text-[#4F6CF7] hover:text-blue-700 font-medium text-sm" onclick="toggleModal('addDeviceModal', true)">编辑</button>
+<button class="text-red-500 hover:text-red-700 font-medium text-sm" onclick="confirm('确定删除该设备吗？')">删除</button>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-4 text-sm font-mono text-slate-500">ARM-03</td>
+<td class="px-6 py-4">
+<div class="flex items-center space-x-2">
+<span class="text-sm font-medium text-slate-700">机械臂_03</span>
+<iconify-icon class="text-slate-300 cursor-pointer hover:text-[#4F6CF7] text-xs" icon="lucide:edit-2" onclick="inlineEdit(this)"></iconify-icon>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600 font-mono">192.168.1.103</td>
+<td class="px-6 py-4 text-sm text-slate-600">ARM-X-200</td>
+<td class="px-6 py-4 text-sm text-slate-600">B区 01流水线</td>
+<td class="px-6 py-4 text-sm text-slate-400 font-mono">2026-05-18 10:50</td>
+<td class="px-6 py-4">
+<div class="flex items-center space-x-3">
+<button class="text-[#4F6CF7] hover:text-blue-700 font-medium text-sm" onclick="toggleModal('addDeviceModal', true)">编辑</button>
+<button class="text-red-500 hover:text-red-700 font-medium text-sm" onclick="confirm('确定删除该设备吗？')">删除</button>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-4 text-sm font-mono text-slate-500">ARM-04</td>
+<td class="px-6 py-4">
+<div class="flex items-center space-x-2">
+<span class="text-sm font-medium text-slate-700">机械臂_04</span>
+<iconify-icon class="text-slate-300 cursor-pointer hover:text-[#4F6CF7] text-xs" icon="lucide:edit-2" onclick="inlineEdit(this)"></iconify-icon>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600 font-mono">192.168.1.104</td>
+<td class="px-6 py-4 text-sm text-slate-600">ARM-X-200</td>
+<td class="px-6 py-4 text-sm text-slate-600">B区 02流水线</td>
+<td class="px-6 py-4 text-sm text-slate-400 font-mono">2026-05-18 10:48</td>
+<td class="px-6 py-4">
+<div class="flex items-center space-x-3">
+<button class="text-[#4F6CF7] hover:text-blue-700 font-medium text-sm" onclick="toggleModal('addDeviceModal', true)">编辑</button>
+<button class="text-red-500 hover:text-red-700 font-medium text-sm" onclick="confirm('确定删除该设备吗？')">删除</button>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-4 text-sm font-mono text-slate-500">ARM-05</td>
+<td class="px-6 py-4">
+<div class="flex items-center space-x-2">
+<span class="text-sm font-medium text-slate-700">机械臂_05</span>
+<iconify-icon class="text-slate-300 cursor-pointer hover:text-[#4F6CF7] text-xs" icon="lucide:edit-2" onclick="inlineEdit(this)"></iconify-icon>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600 font-mono">192.168.1.105</td>
+<td class="px-6 py-4 text-sm text-slate-600">ARM-X-100</td>
+<td class="px-6 py-4 text-sm text-slate-600">A区 03流水线</td>
+<td class="px-6 py-4 text-sm text-slate-400 font-mono">2026-05-18 10:45</td>
+<td class="px-6 py-4">
+<div class="flex items-center space-x-3">
+<button class="text-[#4F6CF7] hover:text-blue-700 font-medium text-sm" onclick="toggleModal('addDeviceModal', true)">编辑</button>
+<button class="text-red-500 hover:text-red-700 font-medium text-sm" onclick="confirm('确定删除该设备吗？')">删除</button>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-4 text-sm font-mono text-slate-500">ARM-06</td>
+<td class="px-6 py-4">
+<div class="flex items-center space-x-2">
+<span class="text-sm font-medium text-slate-700">机械臂_06</span>
+<iconify-icon class="text-slate-300 cursor-pointer hover:text-[#4F6CF7] text-xs" icon="lucide:edit-2" onclick="inlineEdit(this)"></iconify-icon>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600 font-mono">192.168.1.106</td>
+<td class="px-6 py-4 text-sm text-slate-600">ARM-S-PRO</td>
+<td class="px-6 py-4 text-sm text-slate-600">C区 精密组装</td>
+<td class="px-6 py-4 text-sm text-slate-400 font-mono">2026-05-18 10:40</td>
+<td class="px-6 py-4">
+<div class="flex items-center space-x-3">
+<button class="text-[#4F6CF7] hover:text-blue-700 font-medium text-sm" onclick="toggleModal('addDeviceModal', true)">编辑</button>
+<button class="text-red-500 hover:text-red-700 font-medium text-sm" onclick="confirm('确定删除该设备吗？')">删除</button>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-4 text-sm font-mono text-slate-500">ARM-07</td>
+<td class="px-6 py-4">
+<div class="flex items-center space-x-2">
+<span class="text-sm font-medium text-slate-700">机械臂_07</span>
+<iconify-icon class="text-slate-300 cursor-pointer hover:text-[#4F6CF7] text-xs" icon="lucide:edit-2" onclick="inlineEdit(this)"></iconify-icon>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600 font-mono">192.168.1.107</td>
+<td class="px-6 py-4 text-sm text-slate-600">ARM-S-PRO</td>
+<td class="px-6 py-4 text-sm text-slate-600">C区 精密组装</td>
+<td class="px-6 py-4 text-sm text-slate-400 font-mono">2026-05-18 10:23</td>
+<td class="px-6 py-4">
+<div class="flex items-center space-x-3">
+<button class="text-[#4F6CF7] hover:text-blue-700 font-medium text-sm" onclick="toggleModal('addDeviceModal', true)">编辑</button>
+<button class="text-red-500 hover:text-red-700 font-medium text-sm" onclick="confirm('确定删除该设备吗？')">删除</button>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-4 text-sm font-mono text-slate-500">ARM-08</td>
+<td class="px-6 py-4">
+<div class="flex items-center space-x-2">
+<span class="text-sm font-medium text-slate-700">机械臂_08</span>
+<iconify-icon class="text-slate-300 cursor-pointer hover:text-[#4F6CF7] text-xs" icon="lucide:edit-2" onclick="inlineEdit(this)"></iconify-icon>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600 font-mono">192.168.1.108</td>
+<td class="px-6 py-4 text-sm text-slate-600">ARM-X-200</td>
+<td class="px-6 py-4 text-sm text-slate-600">B区 03流水线</td>
+<td class="px-6 py-4 text-sm text-slate-400 font-mono">2026-05-18 09:30</td>
+<td class="px-6 py-4">
+<div class="flex items-center space-x-3">
+<button class="text-[#4F6CF7] hover:text-blue-700 font-medium text-sm" onclick="toggleModal('addDeviceModal', true)">编辑</button>
+<button class="text-red-500 hover:text-red-700 font-medium text-sm" onclick="confirm('确定删除该设备吗？')">删除</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+</main>
+<!-- 告警详情抽屉 -->
+<div class="fixed inset-0 bg-black/30 z-[60] hidden opacity-0 transition-opacity duration-300" id="alarmDrawerOverlay" onclick="toggleDrawer(false)"></div>
+<div class="fixed right-0 top-0 h-full w-[480px] bg-white z-[70] shadow-2xl transform translate-x-full drawer-transition flex flex-col" id="alarmDrawer">
+<div class="p-6 border-b border-slate-100 flex items-center justify-between">
+<h3 class="text-lg font-bold text-slate-800">告警详情</h3>
+<button class="text-slate-400 hover:text-slate-600 transition-colors" onclick="toggleDrawer(false)">
+<iconify-icon class="text-2xl" icon="lucide:x"></iconify-icon>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto p-8 space-y-8">
+<div class="space-y-4">
+<div class="flex items-center space-x-3">
+<span class="px-3 py-1 bg-red-500 text-white text-xs font-bold rounded" id="drawer-level">严重</span>
+<span class="text-slate-400 text-sm font-mono" id="drawer-id">AL-2026-0518-001</span>
+</div>
+<h4 class="text-xl font-bold text-slate-800" id="drawer-title">机械臂_07 关节2温度超限</h4>
+<p class="text-slate-500 text-sm leading-relaxed">检测到关节2当前温度为 85°C，超过设定阈值 75°C。持续的高温可能导致电机线圈损坏或结构形变。</p>
+</div>
+<div class="grid grid-cols-2 gap-6 bg-slate-50 p-6 rounded-xl">
+<div>
+<p class="text-[10px] text-slate-400 uppercase font-bold mb-1">设备名称</p>
+<p class="text-sm font-semibold text-slate-700" id="drawer-device">机械臂_07</p>
+</div>
+<div>
+<p class="text-[10px] text-slate-400 uppercase font-bold mb-1">发生时间</p>
+<p class="text-sm font-semibold text-slate-700" id="drawer-time">2026-05-18 10:23:15</p>
+</div>
+<div>
+<p class="text-[10px] text-slate-400 uppercase font-bold mb-1">确认状态</p>
+<p class="text-sm font-semibold text-slate-700">未确认</p>
+</div>
+<div>
+<p class="text-[10px] text-slate-400 uppercase font-bold mb-1">处理建议</p>
+<p class="text-sm font-semibold text-[#4F6CF7]">立即停机检查冷却系统</p>
+</div>
+</div>
+<div class="space-y-4">
+<h5 class="font-bold text-slate-800 flex items-center">
+<iconify-icon class="mr-2 text-[#4F6CF7]" icon="lucide:info"></iconify-icon> 建议操作
+                </h5>
+<ul class="space-y-3">
+<li class="flex items-start space-x-3 text-sm text-slate-600">
+<span class="w-5 h-5 bg-slate-200 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold">1</span>
+<span>通过远程控制面板暂时停用该设备。</span>
+</li>
+<li class="flex items-start space-x-3 text-sm text-slate-600">
+<span class="w-5 h-5 bg-slate-200 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold">2</span>
+<span>检查关节2的散热片是否积尘或风扇是否故障。</span>
+</li>
+<li class="flex items-start space-x-3 text-sm text-slate-600">
+<span class="w-5 h-5 bg-slate-200 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold">3</span>
+<span>若硬件无异常，请校准温度传感器。</span>
+</li>
+</ul>
+</div>
+</div>
+<div class="p-6 border-t border-slate-100 grid grid-cols-2 gap-4">
+<button class="bg-slate-100 text-slate-700 py-3 rounded-xl font-bold text-sm hover:bg-slate-200 transition-colors" onclick="alert('已确认该告警')">确认告警</button>
+<button class="bg-[#4F6CF7] text-white py-3 rounded-xl font-bold text-sm hover:bg-blue-600 transition-colors shadow-lg" onclick="toggleModal('newOrderModal', true); toggleDrawer(false)">创建运维工单</button>
+</div>
+</div>
+<!-- 新建工单模态框 -->
+<div class="fixed inset-0 bg-black/50 z-[100] hidden items-center justify-center p-4" id="newOrderModal">
+<div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+<div class="p-6 border-b border-slate-100 flex items-center justify-between">
+<h3 class="text-lg font-bold text-slate-800">新建运维工单</h3>
+<button class="text-slate-400 hover:text-slate-600" onclick="toggleModal('newOrderModal', false)">
+<iconify-icon class="text-2xl" icon="lucide:x"></iconify-icon>
+</button>
+</div>
+<div class="p-8 space-y-5">
+<div>
+<label class="block text-xs font-bold text-slate-400 uppercase mb-1.5">工单标题</label>
+<input class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F6CF7]/20" placeholder="例如：机械臂_07 关节温度异常检修" type="text"/>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<label class="block text-xs font-bold text-slate-400 uppercase mb-1.5">关联设备</label>
+<select class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none">
+<option>机械臂_01</option>
+<option>机械臂_07</option>
+</select>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-400 uppercase mb-1.5">优先级</label>
+<select class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none">
+<option>高</option>
+<option>中</option>
+<option>低</option>
+</select>
+</div>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-400 uppercase mb-1.5">问题描述</label>
+<textarea class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F6CF7]/20" placeholder="请详细描述故障现象..." rows="3"></textarea>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-400 uppercase mb-1.5">指派给</label>
+<select class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none">
+<option>张三 (系统维护专家)</option>
+<option>李四 (现场工程师)</option>
+<option>王五 (高级技师)</option>
+</select>
+</div>
+</div>
+<div class="p-6 bg-slate-50 flex justify-end space-x-3">
+<button class="px-6 py-2.5 text-sm font-bold text-slate-500 hover:text-slate-700 transition-colors" onclick="toggleModal('newOrderModal', false)">取消</button>
+<button class="bg-[#4F6CF7] text-white px-8 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 shadow-md transition-colors" onclick="submitNewOrder()">提交工单</button>
+</div>
+</div>
+</div>
+<!-- 设备详情模态框 (通用) -->
+<div class="fixed inset-0 bg-black/50 z-[100] hidden items-center justify-center p-4" id="addDeviceModal">
+<div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+<div class="p-6 border-b border-slate-100 flex items-center justify-between">
+<h3 class="text-lg font-bold text-slate-800">添加新设备</h3>
+<button class="text-slate-400 hover:text-slate-600" onclick="toggleModal('addDeviceModal', false)">
+<iconify-icon class="text-2xl" icon="lucide:x"></iconify-icon>
+</button>
+</div>
+<div class="p-8 space-y-4">
+<div>
+<label class="block text-xs font-bold text-slate-400 mb-1.5 uppercase">设备名称</label>
+<input class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none" placeholder="机械臂_09" type="text"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-400 mb-1.5 uppercase">IP地址</label>
+<input class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none" placeholder="192.168.1.109" type="text"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-400 mb-1.5 uppercase">型号</label>
+<input class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none" placeholder="ARM-X-200" type="text"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-400 mb-1.5 uppercase">所在位置</label>
+<input class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none" placeholder="C区 03流水线" type="text"/>
+</div>
+</div>
+<div class="p-6 bg-slate-50 flex justify-end space-x-3">
+<button class="px-6 py-2.5 text-sm font-bold text-slate-500" onclick="toggleModal('addDeviceModal', false)">取消</button>
+<button class="bg-[#4F6CF7] text-white px-8 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 transition-colors shadow-md" onclick="alert('设备添加成功'); toggleModal('addDeviceModal', false)">保存设备</button>
+</div>
+</div>
+</div>
+<script>
+        // 全局状态
+        let currentActiveDevice = 1;
+        const devices = Array.from({ length: 8 }, (_, i) => ({
+            id: i + 1,
+            name: `机械臂_0${i + 1}`,
+            status: i === 6 ? 'offline' : (i === 7 ? 'warning' : 'online'),
+            params: {
+                j1_temp: 42 + Math.random() * 10,
+                j2_temp: 45 + Math.random() * 15,
+                end_x: (Math.random() * 500).toFixed(2),
+                end_y: (Math.random() * 500).toFixed(2),
+                end_z: (Math.random() * 500).toFixed(2),
+                task: i % 2 === 0 ? '组装作业' : '搬运作业'
+            }
+        }));
+
+        // 初始化
+        window.onload = () => {
+            updateTime();
+            setInterval(updateTime, 1000);
+            renderDeviceList();
+            switchDevice(1);
+            renderAlarmTable();
+            renderHistoryTable();
+            renderOrderGrid();
+            renderDeviceManagement();
+            initCharts();
+        };
+
+        // 动态时钟
+        function updateTime() {
+            const now = new Date();
+            const timeStr = now.getFullYear() + '-' + 
+                String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+                String(now.getDate()).padStart(2, '0') + ' ' + 
+                String(now.getHours()).padStart(2, '0') + ':' + 
+                String(now.getMinutes()).padStart(2, '0') + ':' + 
+                String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('current-time').innerText = timeStr;
+        }
+
+        // 页面切换
+        function switchPage(pageId, element) {
+            document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-' + pageId).classList.add('active');
+            
+            document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('sidebar-item-active'));
+            element.classList.add('sidebar-item-active');
+
+            const titles = {
+                dashboard: '实时监控看板',
+                alarms: '异常告警中心',
+                history: '历史数据查询',
+                orders: '远程运维工单',
+                devices: '设备管理'
+            };
+            document.getElementById('page-title').innerText = titles[pageId];
+
+            if (pageId === 'dashboard') initCharts();
+            if (pageId === 'history') initHistoryChart();
+        }
+
+        // 渲染设备列表 (看板)
+        function renderDeviceList() {
+            const container = document.getElementById('device-list-container');
+            container.innerHTML = devices.map(d => `
+                <div onclick="switchDevice(${d.id})" class="device-item group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${d.id === currentActiveDevice ? 'bg-blue-50 border border-blue-100' : 'hover:bg-slate-50'}">
+                    <div class="flex items-center space-x-3">
+                        <span class="status-dot ${d.status === 'online' ? 'bg-green-500' : (d.status === 'warning' ? 'bg-orange-500' : 'bg-red-500')}"></span>
+                        <span class="text-sm font-medium ${d.id === currentActiveDevice ? 'text-[#4F6CF7]' : 'text-slate-600'}">${d.name}</span>
+                    </div>
+                    <iconify-icon icon="lucide:chevron-right" class="text-slate-300 group-hover:text-slate-400 ${d.id === currentActiveDevice ? 'opacity-100' : 'opacity-0'}"></iconify-icon>
+                </div>
+            `).join('');
+        }
+
+        // 切换设备详情
+        function switchDevice(id) {
+            currentActiveDevice = id;
+            const device = devices.find(d => d.id === id);
+            document.getElementById('detail-title').innerText = `关键参数 - ${device.name}`;
+            
+            const paramGrid = document.getElementById('param-grid');
+            const data = device.params;
+            paramGrid.innerHTML = `
+                <div class="bg-slate-50 p-4 rounded-xl">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase mb-1">关节1温度</p>
+                    <p class="text-lg font-bold text-slate-700">${data.j1_temp.toFixed(1)}°C</p>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-xl">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase mb-1">关节2温度</p>
+                    <p class="text-lg font-bold text-slate-700">${data.j2_temp.toFixed(1)}°C</p>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-xl">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase mb-1">末端X(mm)</p>
+                    <p class="text-lg font-bold text-slate-700">${data.end_x}</p>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-xl">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase mb-1">末端Y(mm)</p>
+                    <p class="text-lg font-bold text-slate-700">${data.end_y}</p>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-xl">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase mb-1">末端Z(mm)</p>
+                    <p class="text-lg font-bold text-slate-700">${data.end_z}</p>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-xl">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase mb-1">当前任务</p>
+                    <p class="text-sm font-bold text-[#4F6CF7] mt-1">${data.task}</p>
+                </div>
+            `;
+            
+            renderDeviceList();
+            initCharts(); // 重新绘制图表模拟数据变化
+        }
+
+        // 渲染告警表格
+        function renderAlarmTable() {
+            const tbody = document.getElementById('alarm-table-body');
+            const alarmData = [
+                { id: 'AL-001', level: '严重', device: '机械臂_07', content: '关节2温度超限 (85°C)', time: '2026-05-18 10:23:15', confirmed: false, status: '未处理' },
+                { id: 'AL-002', level: '警告', device: '机械臂_04', content: '关节5震动异常', time: '2026-05-18 10:18:42', confirmed: true, status: '处理中' },
+                { id: 'AL-003', level: '提示', device: '机械臂_02', content: '定期校准已到期', time: '2026-05-18 10:05:00', confirmed: true, status: '已解决' },
+                { id: 'AL-004', level: '警告', device: '机械臂_01', content: '通信延迟过高', time: '2026-05-18 09:45:12', confirmed: false, status: '未处理' },
+                { id: 'AL-005', level: '严重', device: '机械臂_08', content: '急停按钮触发', time: '2026-05-18 09:30:00', confirmed: true, status: '已解决' },
+                { id: 'AL-006', level: '提示', device: '机械臂_03', content: '润滑液液位低', time: '2026-05-18 09:15:33', confirmed: false, status: '未处理' },
+                { id: 'AL-007', level: '警告', device: '机械臂_06', content: '负载超出额定范围', time: '2026-05-18 08:50:21', confirmed: true, status: '处理中' },
+                { id: 'AL-008', level: '提示', device: '机械臂_05', content: '系统更新可用', time: '2026-05-18 08:20:05', confirmed: false, status: '未处理' }
+            ];
+
+            tbody.innerHTML = alarmData.map(a => `
+                <tr class="hover:bg-slate-50 cursor-pointer transition-colors" onclick="showAlarmDetail('${a.id}', '${a.level}', '${a.device}', '${a.content}', '${a.time}')">
+                    <td class="px-6 py-4 text-sm font-mono text-slate-500">${a.id}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 rounded text-[10px] font-bold uppercase ${a.level === '严重' ? 'bg-red-100 text-red-600' : (a.level === '警告' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600')}">${a.level}</span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-slate-700 font-medium">${a.device}</td>
+                    <td class="px-6 py-4 text-sm text-slate-600">${a.content}</td>
+                    <td class="px-6 py-4 text-sm text-slate-500 font-mono">${a.time.split(' ')[1]}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 rounded-full text-[10px] font-medium ${a.confirmed ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}">${a.confirmed ? '已确认' : '未确认'}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 rounded-full text-[10px] font-medium ${a.status === '已解决' ? 'bg-green-100 text-green-700' : (a.status === '处理中' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700')}">${a.status}</span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // 渲染工单卡片
+        function renderOrderGrid() {
+            const grid = document.getElementById('order-grid');
+            const orders = [
+                { id: 'WO-2025-001', title: '机械臂_07 关节温度异常检修', device: '机械臂_07', priority: '高', status: '处理中', time: '2026-05-18 10:30', user: '张三' },
+                { id: 'WO-2025-002', title: '机械臂_04 关节抖动校准', device: '机械臂_04', priority: '中', status: '待处理', time: '2026-05-18 11:15', user: '李四' },
+                { id: 'WO-2025-003', title: '全厂设备季度例行保养', device: '全部设备', priority: '低', status: '已完成', time: '2026-05-17 09:00', user: '王五' },
+                { id: 'WO-2025-004', title: '机械臂_01 通信模块更换', device: '机械臂_01', priority: '高', status: '待处理', time: '2026-05-18 13:45', user: '赵六' },
+                { id: 'WO-2025-005', title: '机械臂_08 急停电路复位', device: '机械臂_08', priority: '高', status: '已完成', time: '2026-05-18 09:40', user: '张三' },
+                { id: 'WO-2025-006', title: '机械臂_03 润滑油添加', device: '机械臂_03', priority: '低', status: '待处理', time: '2026-05-18 14:20', user: '李四' }
+            ];
+
+            grid.innerHTML = orders.map(o => `
+                <div class="bg-white p-6 rounded-[12px] card-shadow border border-slate-100 hover:border-[#4F6CF7]/30 transition-all group">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="text-xs font-mono text-slate-400">${o.id}</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${o.priority === '高' ? 'bg-red-100 text-red-600' : (o.priority === '中' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600')}">${o.priority}</span>
+                    </div>
+                    <h4 class="font-bold text-slate-800 mb-2 group-hover:text-[#4F6CF7] transition-colors">${o.title}</h4>
+                    <div class="space-y-2 mb-6">
+                        <div class="flex items-center text-xs text-slate-500">
+                            <iconify-icon icon="lucide:box" class="mr-2"></iconify-icon> ${o.device}
+                        </div>
+                        <div class="flex items-center text-xs text-slate-500">
+                            <iconify-icon icon="lucide:clock" class="mr-2"></iconify-icon> ${o.time}
+                        </div>
+                        <div class="flex items-center text-xs text-slate-500">
+                            <iconify-icon icon="lucide:user" class="mr-2"></iconify-icon> 指派给: ${o.user}
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between pt-4 border-t border-slate-50">
+                        <span class="text-xs font-medium ${o.status === '已完成' ? 'text-green-600' : (o.status === '处理中' ? 'text-blue-600' : 'text-slate-400')} flex items-center">
+                            <span class="w-1.5 h-1.5 rounded-full mr-2 ${o.status === '已完成' ? 'bg-green-500' : (o.status === '处理中' ? 'bg-blue-500' : 'bg-slate-300')}"></span>
+                            ${o.status}
+                        </span>
+                        <a href="javascript:void(0)" onclick="alert('查看详情: ${o.id}')" class="text-xs font-bold text-[#4F6CF7] hover:underline">查看详情</a>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 渲染设备管理列表
+        function renderDeviceManagement() {
+            const tbody = document.getElementById('device-management-body');
+            const data = [
+                { id: 'ARM-01', name: '机械臂_01', ip: '192.168.1.101', model: 'ARM-X-100', loc: 'A区 01流水线', time: '2026-05-18 10:55' },
+                { id: 'ARM-02', name: '机械臂_02', ip: '192.168.1.102', model: 'ARM-X-100', loc: 'A区 02流水线', time: '2026-05-18 10:52' },
+                { id: 'ARM-03', name: '机械臂_03', ip: '192.168.1.103', model: 'ARM-X-200', loc: 'B区 01流水线', time: '2026-05-18 10:50' },
+                { id: 'ARM-04', name: '机械臂_04', ip: '192.168.1.104', model: 'ARM-X-200', loc: 'B区 02流水线', time: '2026-05-18 10:48' },
+                { id: 'ARM-05', name: '机械臂_05', ip: '192.168.1.105', model: 'ARM-X-100', loc: 'A区 03流水线', time: '2026-05-18 10:45' },
+                { id: 'ARM-06', name: '机械臂_06', ip: '192.168.1.106', model: 'ARM-S-PRO', loc: 'C区 精密组装', time: '2026-05-18 10:40' },
+                { id: 'ARM-07', name: '机械臂_07', ip: '192.168.1.107', model: 'ARM-S-PRO', loc: 'C区 精密组装', time: '2026-05-18 10:23' },
+                { id: 'ARM-08', name: '机械臂_08', ip: '192.168.1.108', model: 'ARM-X-200', loc: 'B区 03流水线', time: '2026-05-18 09:30' }
+            ];
+
+            tbody.innerHTML = data.map(d => `
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4 text-sm font-mono text-slate-500">${d.id}</td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm font-medium text-slate-700">${d.name}</span>
+                            <iconify-icon icon="lucide:edit-2" class="text-slate-300 cursor-pointer hover:text-[#4F6CF7] text-xs" onclick="inlineEdit(this)"></iconify-icon>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-slate-600 font-mono">${d.ip}</td>
+                    <td class="px-6 py-4 text-sm text-slate-600">${d.model}</td>
+                    <td class="px-6 py-4 text-sm text-slate-600">${d.loc}</td>
+                    <td class="px-6 py-4 text-sm text-slate-400 font-mono">${d.time}</td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center space-x-3">
+                            <button onclick="toggleModal('addDeviceModal', true)" class="text-[#4F6CF7] hover:text-blue-700 font-medium text-sm">编辑</button>
+                            <button onclick="confirm('确定删除该设备吗？')" class="text-red-500 hover:text-red-700 font-medium text-sm">删除</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // 渲染历史数据表格
+        function renderHistoryTable() {
+            const tbody = document.getElementById('history-table-body');
+            let rows = '';
+            for(let i=0; i<15; i++) {
+                const time = `2026-05-18 10:${String(55-i).padStart(2, '0')}:00`;
+                rows += `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="px-6 py-3 text-sm font-mono text-slate-500">${time}</td>
+                        <td class="px-6 py-3 text-sm text-slate-600">${(Math.random()*360).toFixed(1)}</td>
+                        <td class="px-6 py-3 text-sm text-slate-600">${(40+Math.random()*10).toFixed(1)}</td>
+                        <td class="px-6 py-3 text-sm text-slate-600">${(Math.random()*360).toFixed(1)}</td>
+                        <td class="px-6 py-3 text-sm text-slate-600">${(40+Math.random()*10).toFixed(1)}</td>
+                        <td class="px-6 py-3 text-sm text-slate-600">${(100+Math.random()*200).toFixed(1)}</td>
+                        <td class="px-6 py-3 text-sm text-slate-600">${(100+Math.random()*200).toFixed(1)}</td>
+                        <td class="px-6 py-3 text-sm text-slate-600">${(100+Math.random()*200).toFixed(1)}</td>
+                    </tr>
+                `;
+            }
+            tbody.innerHTML = rows;
+        }
+
+        // 抽屉控制
+        function toggleDrawer(show) {
+            const drawer = document.getElementById('alarmDrawer');
+            const overlay = document.getElementById('alarmDrawerOverlay');
+            if (show) {
+                overlay.classList.remove('hidden');
+                setTimeout(() => overlay.classList.add('opacity-100'), 10);
+                drawer.classList.remove('translate-x-full');
+            } else {
+                overlay.classList.remove('opacity-100');
+                drawer.classList.add('translate-x-full');
+                setTimeout(() => overlay.classList.add('hidden'), 300);
+            }
+        }
+
+        function showAlarmDetail(id, level, device, title, time) {
+            document.getElementById('drawer-id').innerText = id;
+            document.getElementById('drawer-level').innerText = level;
+            document.getElementById('drawer-level').className = `px-3 py-1 text-white text-xs font-bold rounded ${level === '严重' ? 'bg-red-500' : (level === '警告' ? 'bg-orange-500' : 'bg-blue-500')}`;
+            document.getElementById('drawer-title').innerText = title;
+            document.getElementById('drawer-device').innerText = device;
+            document.getElementById('drawer-time').innerText = time;
+            toggleDrawer(true);
+        }
+
+        // 模态框控制
+        function toggleModal(id, show) {
+            const modal = document.getElementById(id);
+            if (show) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            } else {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        function submitNewOrder() {
+            alert('工单创建成功！');
+            toggleModal('newOrderModal', false);
+        }
+
+        function inlineEdit(icon) {
+            const span = icon.previousElementSibling;
+            const currentVal = span.innerText;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentVal;
+            input.className = 'bg-white border border-[#4F6CF7] rounded px-1 py-0.5 text-sm w-32 focus:outline-none';
+            span.replaceWith(input);
+            icon.style.display = 'none';
+            
+            input.focus();
+            input.onblur = () => {
+                const newVal = input.value;
+                const newSpan = document.createElement('span');
+                newSpan.className = 'text-sm font-medium text-slate-700';
+                newSpan.innerText = newVal;
+                input.replaceWith(newSpan);
+                icon.style.display = 'inline-block';
+            };
+            input.onkeydown = (e) => { if(e.key === 'Enter') input.blur(); };
+        }
+
+        // 图表绘制逻辑
+        function initCharts() {
+            const canvas = document.getElementById('jointChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+
+            const colors = ['#4F6CF7', '#22C55E', '#F59E0B', '#EF4444', '#A855F7', '#06B6D4'];
+            const width = rect.width;
+            const height = rect.height;
+            const padding = 40;
+
+            // 清除画布
+            ctx.clearRect(0, 0, width, height);
+
+            // 绘制网格
+            ctx.beginPath();
+            ctx.strokeStyle = '#F1F5F9';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 5; i++) {
+                const y = padding + (height - 2 * padding) * (i / 5);
+                ctx.moveTo(padding, y);
+                ctx.lineTo(width - padding, y);
+            }
+            ctx.stroke();
+
+            // 模拟 6 条曲线
+            colors.forEach((color, idx) => {
+                ctx.beginPath();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.lineJoin = 'round';
+
+                const points = 20;
+                const step = (width - 2 * padding) / (points - 1);
+                
+                // 基于设备 ID 和 关节索引生成随机种子，使不同设备曲线不同
+                const seed = currentActiveDevice * 10 + idx;
+                
+                for (let i = 0; i < points; i++) {
+                    const x = padding + i * step;
+                    // 生成平滑随机值
+                    const randomVal = Math.sin(i * 0.5 + seed) * 30 + Math.cos(i * 0.3 + seed) * 20 + 150;
+                    const y = height - padding - (randomVal / 360) * (height - 2 * padding);
+                    
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            });
+
+            // 绘制轴标签
+            ctx.fillStyle = '#94A3B8';
+            ctx.font = '10px Inter';
+            ctx.fillText('360°', 5, padding + 5);
+            ctx.fillText('0°', 15, height - padding + 5);
+            ctx.fillText('T-5m', padding, height - 10);
+            ctx.fillText('现在', width - padding - 20, height - 10);
+        }
+
+        function initHistoryChart() {
+            const canvas = document.getElementById('historyChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+
+            const width = rect.width;
+            const height = rect.height;
+            const padding = 50;
+
+            ctx.clearRect(0, 0, width, height);
+            
+            // 绘制背景渐变
+            const gradient = ctx.createLinearGradient(0, padding, 0, height - padding);
+            gradient.addColorStop(0, 'rgba(79, 108, 247, 0.05)');
+            gradient.addColorStop(1, 'rgba(79, 108, 247, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(padding, padding, width - 2 * padding, height - 2 * padding);
+
+            // 绘制主曲线
+            ctx.beginPath();
+            ctx.strokeStyle = '#4F6CF7';
+            ctx.lineWidth = 3;
+            const points = 50;
+            const step = (width - 2 * padding) / (points - 1);
+            for (let i = 0; i < points; i++) {
+                const x = padding + i * step;
+                const val = 180 + Math.sin(i * 0.2) * 60 + Math.random() * 20;
+                const y = height - padding - (val / 360) * (height - 2 * padding);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // 绘制辅助线和标签
+            ctx.strokeStyle = '#E2E8F0';
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(padding, height / 2);
+            ctx.lineTo(width - padding, height / 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = '#64748B';
+            ctx.font = '12px Inter';
+            ctx.fillText('180°', 10, height / 2 + 5);
+            ctx.fillText('08:00', padding, height - 15);
+            ctx.fillText('12:00', width / 2 - 15, height - 15);
+            ctx.fillText('16:00', width - padding - 30, height - 15);
+        }
+
+        // 窗口缩放重绘图表
+        window.addEventListener('resize', () => {
+            initCharts();
+            if (document.getElementById('page-history').classList.contains('active')) initHistoryChart();
+        });
+    </script>
+</body></html>
